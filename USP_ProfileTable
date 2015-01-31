@@ -5,15 +5,15 @@ Example: EXEC USP_ProfileTable TableName
 */
 AS
 BEGIN  
-    IF OBJECT_ID('tempdb..TableProfile') IS NOT NULL
-        DROP TABLE TableProfile
+    IF OBJECT_ID('tempdb..#TableProfile') IS NOT NULL
+        DROP TABLE #TableProfile
 
     SELECT ROW_NUMBER() OVER(ORDER BY C.Name) AS 'ColIndex', 
            C.Name AS 'ColumnName', t.Name  AS 'Data type',
            -1 AS 'AllNull', -1 AS 'NullCount', -1 AS 'DistinctValue',
            Convert(nvarchar(MAX),'') AS 'First50Disctinct',
            c.precision ,c.scale , c.is_nullable, ISNULL(i.is_primary_key, 0) 'Primary Key'           
-    INTO TableProfile
+    INTO #TableProfile
     FROM SYS.COLUMNS AS C
          INNER JOIN 
          sys.types t 
@@ -30,12 +30,12 @@ BEGIN
     Declare @colName nvarchar(200);
     
     DECLARE @Counter int;
-    SELECT @Counter = COUNT(*) FROM TableProfile;    
+    SELECT @Counter = COUNT(*) FROM #TableProfile;    
     WHILE @Counter>0
     BEGIN
-        SELECT @colName='[' + ColumnName + ']' FROM TableProfile WHERE ColIndex= @Counter;
+        SELECT @colName='[' + ColumnName + ']' FROM #TableProfile WHERE ColIndex= @Counter;
  
-        SET @sqlStr = ' UPDATE TableProfile '+  CHAR(10) +
+        SET @sqlStr = ' UPDATE #TableProfile '+  CHAR(10) +
                       ' SET NullCount = (SELECT COUNT(*) FROM '+ @tableName + ' WHERE ' + @colName  + ' IS NULL ), ' + CHAR(10) +
                       '     DistinctValue = (SELECT COUNT(DISTINCT '+ @colName+') FROM '+ @tableName + ') ' + CHAR(10) +             
                       ' WHERE ColIndex = '+ Convert(VarChar,@Counter)
@@ -48,16 +48,16 @@ BEGIN
     declare @totalRows int
     EXECUTE sp_executesql @sqlStr, N'@cnt int OUTPUT',@cnt=@totalRows OUTPUT 
 
-    UPDATE TableProfile 
+    UPDATE #TableProfile 
     SET AllNull = CASE WHEN @totalRows=NullCount THEN 1 ELSE 0 END
 
     DECLARE @ValueStr NVARCHAR(MAX);
-    SELECT @Counter = COUNT(*) FROM TableProfile;  
+    SELECT @Counter = COUNT(*) FROM #TableProfile;  
     WHILE @Counter>0
     BEGIN    
-        IF 0 = (SELECT AllNull FROM TableProfile WHERE ColIndex= @Counter) 
+        IF 0 = (SELECT AllNull FROM #TableProfile WHERE ColIndex= @Counter) 
         BEGIN  
-            SELECT @colName='[' + ColumnName + ']' FROM TableProfile WHERE ColIndex= @Counter;
+            SELECT @colName='[' + ColumnName + ']' FROM #TableProfile WHERE ColIndex= @Counter;
             SET @ValueStr = '';                      
             SET @sqlStr=';WITH CET AS(SELECT DISTINCT TOP 50 ' + @colName + ' AS Value FROM ' + @tableName + 
                         ' WHERE ' + @colName + ' IS NOT NULL ORDER BY ' + @colName + ' )
@@ -65,7 +65,7 @@ BEGIN
             EXECUTE sp_executesql @sqlStr, N'@ValueStrProxy NVARCHAR(MAX) OUTPUT',@ValueStrProxy=@ValueStr OUTPUT
  
             SET @ValueStr = REPLACE(@ValueStr,'''','`')                            
-            SET @sqlStr = ' UPDATE TableProfile '+  CHAR(10) +
+            SET @sqlStr = ' UPDATE #TableProfile '+  CHAR(10) +
                           ' SET First50Disctinct = ''' + @ValueStr + '''' + 
                           ' WHERE ColIndex = '+ Convert(VarChar,@Counter)
             EXEC sp_executesql @SqlStr;                  
@@ -74,5 +74,5 @@ BEGIN
         SET @Counter = @Counter-1;
     END
 
-    SELECT * FROM TableProfile
+    SELECT * FROM #TableProfile
 END
